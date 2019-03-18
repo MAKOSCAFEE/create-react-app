@@ -75,6 +75,39 @@ module.exports = function(webpackEnv) {
   // Get environment variables to inject into our app.
   const env = getClientEnvironment(publicUrl);
 
+  // Start DHIS2 configurations
+  const dhisConfigPath =
+    process.env.DHIS2_HOME && `${process.env.DHIS2_HOME}/config`;
+  
+  let dhisConfig;
+  try {
+      dhisConfig = require(dhisConfigPath);
+  } catch (e) {
+      // Failed to load config file - use default config
+      console.warn(`\nWARNING! Failed to load DHIS config:`, e.message);
+      dhisConfig = {
+          baseUrl:
+              process.env.REACT_APP_DHIS2_BASE_URL || 'https://play.dhis2.org/demo',
+          authorization: 'Basic YWRtaW46ZGlzdHJpY3Q=', // admin:district
+      };
+  }
+
+  const manifest = JSON.parse(
+    fs.readFileSync(`${paths.appPublic}/manifest.webapp`, 'utf8')
+  );
+
+  const globals = Object.assign(
+    {},
+    {
+        DHIS_CONFIG: JSON.stringify(dhisConfig),
+        manifest: JSON.stringify(manifest),
+    },
+    env.stringified
+  );
+
+
+  const scriptPrefix = dhisConfig.baseUrl;
+
   // common function to get style loaders
   const getStyleLoaders = (cssOptions, preProcessor) => {
     const loaders = [
@@ -562,7 +595,7 @@ module.exports = function(webpackEnv) {
       // It is absolutely essential that NODE_ENV is set to production
       // during a production build.
       // Otherwise React will be compiled in the very slow development mode.
-      new webpack.DefinePlugin(env.stringified),
+      new webpack.DefinePlugin(globals),
       // This is necessary to emit hot updates (currently CSS only):
       isEnvDevelopment && new webpack.HotModuleReplacementPlugin(),
       // Watcher doesn't work well if you mistype casing in a path so we use
